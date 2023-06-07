@@ -29,12 +29,12 @@ volatile bool isLatch = true;
 void setup() {
   // set port C as INPUT by default
   DDRC = 0b0000000;
-  PORTC = 0b0000000; 
+  PORTC = 0b0000000;
 
   // set port B as INPUT
   // this is the input data
   DDRB = 0b00000000;
-  PORTB = 0b11111111; 
+  PORTB = 0b11111111;
 
   // set port D as OUTPUT
   // this is what is driving the LEDs
@@ -57,10 +57,10 @@ void setup() {
 
     PCICR |= 0b00000010; // activate PCINT on port C
     PCMSK1 |= 0b00000001; // activate PCINT on PC0
-     
+
   } else {
     pinMode(PIN_ZERO_IN, INPUT_PULLUP);
-    pinMode(PIN_ZERO_OUT, OUTPUT); 
+    pinMode(PIN_ZERO_OUT, OUTPUT);
   }
 }
 
@@ -100,12 +100,12 @@ void loop() {
       if (zeroIn) {
         digitalWrite(PIN_ZERO_OUT, value == 0);
       }
-    } 
-    
+    }
+
     // right digit
     digit = value >> 4;
     PORTD=(zeroIn && digit == 0) ? 0 : font[digit];
-    
+
     digitalWrite(PIN_RIGHT_DIGIT, LOW);
     delay(1);
     digitalWrite(PIN_RIGHT_DIGIT, HIGH);
@@ -113,7 +113,7 @@ void loop() {
     // left digit
     digit = value & 0b00001111;
     PORTD=(zeroIn && value == 0) ? 0 : font[digit];
-    
+
     digitalWrite(PIN_LEFT_DIGIT, LOW);
     delay(1);
     digitalWrite(PIN_LEFT_DIGIT, HIGH);
