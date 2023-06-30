@@ -14,17 +14,18 @@ byte font[] = {
     0b00111001,  //  C
     0b01011110,  //  D
     0b01111001,  //  E
-    0b01110001   //  F
+    0b01110001,  //  F
+    0b10000000,  // dot
+    0b00000000   // blank
 };
 
 const int PIN_ZERO_OUT = A1;
 const int PIN_ZERO_IN = A0;
-const int PIN_LE = PIN_ZERO_IN;
 const int PIN_MODE = A2;
 const int PIN_LEFT_DIGIT = A3;
 const int PIN_RIGHT_DIGIT = A4;
 
-volatile bool isLatch = true;
+volatile bool isTristate = true;
 
 void setup() {
   // set port C as INPUT by default
@@ -44,77 +45,45 @@ void setup() {
   pinMode(PIN_LEFT_DIGIT, OUTPUT);
   pinMode(PIN_RIGHT_DIGIT, OUTPUT);
   pinMode(PIN_MODE, INPUT_PULLUP);
+  pinMode(PIN_ZERO_IN, INPUT_PULLUP);
+  pinMode(PIN_ZERO_OUT, OUTPUT);
 
   digitalWrite(PIN_RIGHT_DIGIT, HIGH);
   digitalWrite(PIN_LEFT_DIGIT, HIGH);
 
-  isLatch = digitalRead(PIN_MODE);
-  if (isLatch) {
-    pinMode(PIN_LE, INPUT_PULLUP);
-    pinMode(PIN_ZERO_OUT, INPUT);
-
-    updateLatch();
-
-    PCICR |= 0b00000010; // activate PCINT on port C
-    PCMSK1 |= 0b00000001; // activate PCINT on PC0
-
-  } else {
-    pinMode(PIN_ZERO_IN, INPUT_PULLUP);
-    pinMode(PIN_ZERO_OUT, OUTPUT);
-  }
-}
-
-volatile bool latched;
-volatile int previousValue;
-
-void updateLatch() {
-  if (digitalRead(PIN_LE)) {
-    previousValue = 0;
-    latched = false;
-  } else {
-    previousValue = PINB;
-    latched = true;
-  }
-}
-
-ISR (PCINT1_vect) {
-  updateLatch();
+  isTristate = !digitalRead(PIN_MODE); // If jumper is not soldered, this is pulled up, enable zero chaining. If it is soldered, enable tristate
 }
 
 void loop() {
     int value;
     int digit;
-    bool zeroIn;
+    bool zeroIn = false;
+    bool outputEnable = true;
+    
+    value = PINB;
 
-    if (latched) {
-      value = previousValue;
+    if (isTristate) {
+      outputEnable = digitalRead(PIN_ZERO_IN); // Output Enable is active high (defaults to enabled with pull up)
     } else {
-      value = PINB;
+      zeroIn = !digitalRead(PIN_ZERO_IN); // Zero In is active low (zero chaining defaults to disabled with pull up)
+      digitalWrite(PIN_ZERO_OUT, value != 0); // Write zero to enable zero chaining in the next display, if both this display's digit are off
     }
-
-    if (isLatch) {
-      zeroIn = false;
-    } else {
-      zeroIn = digitalRead(PIN_ZERO_IN);
-
-      if (zeroIn) {
-        digitalWrite(PIN_ZERO_OUT, value == 0);
-      }
-    }
-
-    // right digit
-    digit = value >> 4;
-    PORTD=(zeroIn && digit == 0) ? 0 : font[digit];
-
-    digitalWrite(PIN_RIGHT_DIGIT, LOW);
-    delay(1);
-    digitalWrite(PIN_RIGHT_DIGIT, HIGH);
 
     // left digit
+    digit = value >> 4;
+    if (!outputEnable) { digit = 17; }  // display nothing on the left digit to signify no data
+    PORTD=(zeroIn && digit == 0) ? 0 : font[digit];
+
+    digitalWrite(PIN_LEFT_DIGIT, HIGH);
+    delay(1);
+    digitalWrite(PIN_LEFT_DIGIT, LOW);
+
+    // right digit
     digit = value & 0b00001111;
+    if (!outputEnable) { digit = 16; } // display only the dot on the right digit to signify no data
     PORTD=(zeroIn && value == 0) ? 0 : font[digit];
 
-    digitalWrite(PIN_LEFT_DIGIT, LOW);
+    digitalWrite(PIN_RIGHT_DIGIT, HIGH);
     delay(1);
-    digitalWrite(PIN_LEFT_DIGIT, HIGH);
+    digitalWrite(PIN_RIGHT_DIGIT, LOW);
 }
